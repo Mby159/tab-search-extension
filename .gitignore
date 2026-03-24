@@ -1,0 +1,5 @@
+gen_icons.py
+*.xpi
+*.zip
+.DS_Store
+Thumbs.db

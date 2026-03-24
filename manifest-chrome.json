@@ -1,0 +1,35 @@
+{
+  "manifest_version": 3,
+  "name": "Tab Content Search",
+  "version": "1.1.0",
+  "description": "搜索所有已打开标签页的页面内容 | Search across all open tabs",
+  "icons": {
+    "48": "icons/icon48.png",
+    "96": "icons/icon96.png"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "48": "icons/icon48.png"
+    },
+    "default_title": "标签页内容搜索"
+  },
+  "background": {
+    "service_worker": "background-mv3.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["browser-polyfill.js", "content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "permissions": [
+    "tabs",
+    "activeTab",
+    "scripting"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ]
+}
