@@ -263,6 +263,61 @@
       background: #45475a;
     }
 
+    /* ── 导航按钮 ── */
+    .nav-buttons {
+      display: flex;
+      gap: 6px;
+      margin-top: 6px;
+    }
+
+    .nav-btn {
+      flex: 1;
+      padding: 4px 8px;
+      background: #313244;
+      color: #cdd6f4;
+      border: 1px solid #45475a;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 12px;
+      transition: background 0.15s, border-color 0.15s;
+    }
+
+    .nav-btn:hover:not(:disabled) {
+      background: #45475a;
+      border-color: #89b4fa;
+    }
+
+    .nav-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .nav-indicator {
+      display: inline-block;
+      min-width: 40px;
+      text-align: center;
+      font-weight: 600;
+      color: #89b4fa;
+    }
+
+    /* ── 快捷键提示 ── */
+    .shortcuts-hint {
+      padding: 6px 12px;
+      font-size: 11px;
+      color: #6c7086;
+      border-top: 1px solid #313244;
+      background: #181825;
+    }
+
+    .shortcuts-hint kbd {
+      background: #313244;
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-family: monospace;
+      font-size: 10px;
+      margin: 0 2px;
+    }
+
     /* ── 空态 ── */
     .empty-state {
       display: flex;
@@ -305,6 +360,11 @@
 
 <!-- 结果 -->
 <div id="results"></div>
+
+<!-- 快捷键提示 -->
+<div class="shortcuts-hint">
+  <kbd>↑</kbd><kbd>↓</kbd> 选择标签 <kbd>Enter</kbd> 跳转 <kbd>Alt</kbd>+<kbd>S</kbd> 打开
+</div>
 
 <script src="browser-polyfill.js"></script>
 <script src="popup.js"></script>

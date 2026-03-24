@@ -5,6 +5,7 @@
 // 保存高亮节点引用，便于清除
 let highlightedNodes = [];
 let currentMarkElements = [];
+let currentHighlightIndex = -1; // 当前高亮索引
 
 /**
  * 在页面文本中搜索关键词，返回匹配摘要列表
@@ -50,6 +51,10 @@ function searchInPage(query) {
     snippets.forEach(s => results.push(s));
     highlightNode(textNode, query);
   });
+
+  // 重置索引
+  currentHighlightIndex = currentMarkElements.length > 0 ? 0 : -1;
+  updateHighlightStyle();
 
   return results;
 }
@@ -139,15 +144,59 @@ function clearHighlights() {
   });
   currentMarkElements = [];
   highlightedNodes = [];
+  currentHighlightIndex = -1;
+}
+
+/**
+ * 更新当前高亮样式（当前项用不同颜色）
+ */
+function updateHighlightStyle() {
+  currentMarkElements.forEach((mark, index) => {
+    if (index === currentHighlightIndex) {
+      // 当前激活的高亮 - 橙色背景
+      mark.style.cssText = 'background:#ff9800;color:#fff;border-radius:2px;padding:0 2px;font-weight:bold;box-shadow:0 0 0 2px #ff9800;';
+    } else {
+      // 普通高亮 - 黄色背景
+      mark.style.cssText = 'background:#ff0;color:#000;border-radius:2px;padding:0 1px;';
+    }
+  });
+}
+
+/**
+ * 滚动到指定索引的高亮元素
+ */
+function scrollToHighlight(index) {
+  if (index < 0 || index >= currentMarkElements.length) return;
+  currentHighlightIndex = index;
+  updateHighlightStyle();
+  currentMarkElements[index].scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
 /**
  * 滚动到第一个高亮元素
  */
 function scrollToFirstHighlight() {
-  if (currentMarkElements.length > 0) {
-    currentMarkElements[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
-  }
+  scrollToHighlight(0);
+}
+
+/**
+ * 滚动到下一个高亮元素
+ */
+function scrollToNextHighlight() {
+  if (currentMarkElements.length === 0) return;
+  const nextIndex = (currentHighlightIndex + 1) % currentMarkElements.length;
+  scrollToHighlight(nextIndex);
+}
+
+/**
+ * 滚动到上一个高亮元素
+ */
+function scrollToPrevHighlight() {
+  if (currentMarkElements.length === 0) return;
+  const prevIndex = currentHighlightIndex <= 0 
+    ? currentMarkElements.length - 1 
+    : currentHighlightIndex - 1;
+  scrollToHighlight(prevIndex);
 }
 
 // 监听来自 background 的消息
@@ -161,6 +210,18 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
   } else if (message.action === 'scrollToFirst') {
     scrollToFirstHighlight();
     sendResponse({ ok: true });
+  } else if (message.action === 'scrollToNext') {
+    scrollToNextHighlight();
+    sendResponse({ ok: true, index: currentHighlightIndex, total: currentMarkElements.length });
+  } else if (message.action === 'scrollToPrev') {
+    scrollToPrevHighlight();
+    sendResponse({ ok: true, index: currentHighlightIndex, total: currentMarkElements.length });
+  } else if (message.action === 'getHighlightInfo') {
+    sendResponse({ 
+      ok: true, 
+      index: currentHighlightIndex, 
+      total: currentMarkElements.length 
+    });
   }
   return true;
 });
