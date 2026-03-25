@@ -71,4 +71,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     sendResponse({ ok: true });
     return true;
   }
+  if (message.action === 'scrollToNext') {
+    sendToTab(message.tabId, { action: 'scrollToNext' }).then(resp => {
+      sendResponse(resp || { ok: false });
+    });
+    return true;
+  }
+  if (message.action === 'scrollToPrev') {
+    sendToTab(message.tabId, { action: 'scrollToPrev' }).then(resp => {
+      sendResponse(resp || { ok: false });
+    });
+    return true;
+  }
 });
