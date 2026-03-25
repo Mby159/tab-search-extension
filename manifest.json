@@ -42,7 +42,7 @@
     "gecko": {
       "id": "tab-search-extension@Mby159",
       "data_collection_permissions": {
-      "required": "none"
+      "required": ["none"]
     }
     }
   }
