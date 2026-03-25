@@ -39,13 +39,18 @@ function escapeRegex(str) {
 
 function setStatus(text, type) {
   statusBar.className = 'status-bar' + (type ? ` ${type}` : '');
-  statusText.innerHTML = text;
+  statusText.textContent = text;
 }
 
 // ── 搜索逻辑 ──────────────────────────────────────────────
 
 function showSpinner() {
-  setStatus('<span class="spinner"></span> 正在搜索…');
+  statusBar.className = 'status-bar';
+  statusText.innerHTML = ''; // 清空
+  const spinner = document.createElement('span');
+  spinner.className = 'spinner';
+  statusText.appendChild(spinner);
+  statusText.appendChild(document.createTextNode(' 正在搜索…'));
 }
 
 async function doSearch(query) {
@@ -96,10 +101,17 @@ function renderResults(results, query) {
   }
 
   const totalCount = results.reduce((sum, r) => sum + r.count, 0);
-  setStatus(
-    `在 <strong>${results.length}</strong> 个标签页中找到 <strong>${totalCount}</strong> 处匹配`,
-    'has-results'
-  );
+  statusBar.className = 'status-bar has-results';
+  statusText.innerHTML = ''; // 清空
+  statusText.appendChild(document.createTextNode('在 '));
+  const strong1 = document.createElement('strong');
+  strong1.textContent = results.length;
+  statusText.appendChild(strong1);
+  statusText.appendChild(document.createTextNode(' 个标签页中找到 '));
+  const strong2 = document.createElement('strong');
+  strong2.textContent = totalCount;
+  statusText.appendChild(strong2);
+  statusText.appendChild(document.createTextNode(' 处匹配'));
 
   results.forEach((tab, index) => {
     const card = document.createElement('div');

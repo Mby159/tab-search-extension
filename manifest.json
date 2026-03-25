@@ -37,5 +37,11 @@
       },
       "description": "打开标签页搜索"
     }
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "tab-search-extension@Mby159",
+      "data_collection_permissions": []
+    }
   }
 }
