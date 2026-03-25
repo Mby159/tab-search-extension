@@ -41,7 +41,7 @@
   "browser_specific_settings": {
     "gecko": {
       "id": "tab-search-extension@Mby159",
-      "data_collection_permissions": []
+      "data_collection_permissions": {}
     }
   }
 }

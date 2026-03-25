@@ -85,24 +85,33 @@ function clearResults() {
   selectedTabIndex = -1;
 }
 
+function createElement(tag, className, attrs = {}) {
+  const el = document.createElement(tag);
+  if (className) el.className = className;
+  Object.entries(attrs).forEach(([k, v]) => el.setAttribute(k, v));
+  return el;
+}
+
 function renderResults(results, query) {
   clearResults();
   searchResults = results;
 
   if (!results || results.length === 0) {
-    setStatus(`未找到 "${escapeHtml(query)}" 的匹配结果`, 'no-results');
-    resultsEl.innerHTML = `
-      <div class="empty-state">
-        <div class="icon">🔎</div>
-        <p>在所有标签页中未找到匹配内容</p>
-      </div>
-    `;
+    setStatus('未找到 "' + escapeHtml(query) + '" 的匹配结果', 'no-results');
+    const emptyDiv = createElement('div', 'empty-state');
+    const iconDiv = createElement('div', 'icon');
+    iconDiv.textContent = '🔎';
+    const p = document.createElement('p');
+    p.textContent = '在所有标签页中未找到匹配内容';
+    emptyDiv.appendChild(iconDiv);
+    emptyDiv.appendChild(p);
+    resultsEl.appendChild(emptyDiv);
     return;
   }
 
   const totalCount = results.reduce((sum, r) => sum + r.count, 0);
   statusBar.className = 'status-bar has-results';
-  statusText.innerHTML = ''; // 清空
+  statusText.innerHTML = '';
   statusText.appendChild(document.createTextNode('在 '));
   const strong1 = document.createElement('strong');
   strong1.textContent = results.length;
@@ -114,61 +123,102 @@ function renderResults(results, query) {
   statusText.appendChild(document.createTextNode(' 处匹配'));
 
   results.forEach((tab, index) => {
-    const card = document.createElement('div');
-    card.className = 'tab-card' + (index === 0 ? ' expanded' : '');
-    card.dataset.index = index;
-    card.dataset.tabId = tab.tabId;
+    const card = createElement('div', 'tab-card' + (index === 0 ? ' expanded' : ''));
+    card.dataset.index = String(index);
+    card.dataset.tabId = String(tab.tabId);
 
-    const snippetsHtml = tab.snippets
-      .map(s => `<div class="snippet">${highlightSnippet(s, query)}</div>`)
-      .join('');
+    // Header
+    const header = createElement('div', 'tab-header');
+    
+    // Favicon
+    if (tab.favicon) {
+      const img = createElement('img', 'tab-favicon', { src: tab.favicon, alt: '' });
+      img.onerror = function() {
+        this.style.display = 'none';
+        this.nextElementSibling.style.display = 'flex';
+      };
+      const placeholder = createElement('div', 'tab-favicon-placeholder');
+      placeholder.style.display = 'none';
+      placeholder.textContent = '🌐';
+      header.appendChild(img);
+      header.appendChild(placeholder);
+    } else {
+      const placeholder = createElement('div', 'tab-favicon-placeholder');
+      placeholder.textContent = '🌐';
+      header.appendChild(placeholder);
+    }
 
-    const faviconHtml = tab.favicon
-      ? `<img class="tab-favicon" src="${escapeHtml(tab.favicon)}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
-        + `<div class="tab-favicon-placeholder" style="display:none">🌐</div>`
-      : `<div class="tab-favicon-placeholder">🌐</div>`;
+    // Title
+    const titleSpan = createElement('span', 'tab-title', { title: tab.title });
+    titleSpan.textContent = tab.title;
+    header.appendChild(titleSpan);
 
-    card.innerHTML = `
-      <div class="tab-header">
-        ${faviconHtml}
-        <span class="tab-title" title="${escapeHtml(tab.title)}">${escapeHtml(tab.title)}</span>
-        <span class="tab-count">${tab.count}</span>
-        <span class="tab-toggle">▼</span>
-      </div>
-      <div class="tab-snippets">
-        <div class="tab-url" title="${escapeHtml(tab.url)}">${escapeHtml(tab.url)}</div>
-        ${snippetsHtml}
-        <div class="nav-buttons">
-          <button class="nav-btn nav-prev" data-tab-id="${tab.tabId}" title="上一个匹配 (Shift+Enter)">◀ 上一个</button>
-          <span class="nav-indicator" id="indicator-${tab.tabId}">1 / ${tab.count}</span>
-          <button class="nav-btn nav-next" data-tab-id="${tab.tabId}" title="下一个匹配 (Enter)">下一个 ▶</button>
-        </div>
-        <button class="focus-btn" data-tab-id="${tab.tabId}">
-          → 跳转到该标签页
-        </button>
-      </div>
-    `;
+    // Count
+    const countSpan = createElement('span', 'tab-count');
+    countSpan.textContent = String(tab.count);
+    header.appendChild(countSpan);
 
-    // 展开/收起
-    const header = card.querySelector('.tab-header');
+    // Toggle
+    const toggleSpan = createElement('span', 'tab-toggle');
+    toggleSpan.textContent = '▼';
+    header.appendChild(toggleSpan);
+
+    card.appendChild(header);
+
+    // Snippets container
+    const snippetsDiv = createElement('div', 'tab-snippets');
+
+    // URL
+    const urlDiv = createElement('div', 'tab-url', { title: tab.url });
+    urlDiv.textContent = tab.url;
+    snippetsDiv.appendChild(urlDiv);
+
+    // Snippets
+    tab.snippets.forEach(s => {
+      const snippetDiv = createElement('div', 'snippet');
+      snippetDiv.textContent = s;
+      snippetsDiv.appendChild(snippetDiv);
+    });
+
+    // Nav buttons
+    const navDiv = createElement('div', 'nav-buttons');
+    const prevBtn = createElement('button', 'nav-btn nav-prev', { 'data-tab-id': String(tab.tabId), title: '上一个匹配 (Shift+Enter)' });
+    prevBtn.textContent = '◀ 上一个';
+    const indicator = createElement('span', 'nav-indicator');
+    indicator.id = 'indicator-' + tab.tabId;
+    indicator.textContent = '1 / ' + tab.count;
+    const nextBtn = createElement('button', 'nav-btn nav-next', { 'data-tab-id': String(tab.tabId), title: '下一个匹配 (Enter)' });
+    nextBtn.textContent = '下一个 ▶';
+    navDiv.appendChild(prevBtn);
+    navDiv.appendChild(indicator);
+    navDiv.appendChild(nextBtn);
+    snippetsDiv.appendChild(navDiv);
+
+    // Focus button
+    const focusBtn = createElement('button', 'focus-btn', { 'data-tab-id': String(tab.tabId) });
+    focusBtn.textContent = '→ 跳转到该标签页';
+    snippetsDiv.appendChild(focusBtn);
+
+    card.appendChild(snippetsDiv);
+
+    // Event listeners
     header.addEventListener('click', () => {
       card.classList.toggle('expanded');
       selectedTabIndex = parseInt(card.dataset.index);
       updateSelection();
     });
 
-    // 上一个/下一个导航
-    card.querySelector('.nav-prev').addEventListener('click', (e) => {
+    prevBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       navigateHighlight(tab.tabId, 'prev');
     });
-    card.querySelector('.nav-next').addEventListener('click', (e) => {
+
+    nextBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       navigateHighlight(tab.tabId, 'next');
     });
 
-    // 跳转按钮
-    card.querySelector('.focus-btn').addEventListener('click', (e) => {
+    focusBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       focusTab(tab.tabId);
     });
@@ -176,7 +226,6 @@ function renderResults(results, query) {
     resultsEl.appendChild(card);
   });
 
-  // 默认选中第一个
   selectedTabIndex = 0;
   updateSelection();
 }
