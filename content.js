@@ -180,23 +180,46 @@ function scrollToFirstHighlight() {
 }
 
 /**
+ * 获取当前高亮元素附近的摘要文本
+ */
+function getSnippetAtIndex(index) {
+  if (index < 0 || index >= currentMarkElements.length) return '';
+  const mark = currentMarkElements[index];
+  // 取 mark 所在父元素的完整文本，截取前后各40字符
+  const parent = mark.parentElement;
+  if (!parent) return mark.textContent;
+  const fullText = parent.textContent;
+  const markText = mark.textContent;
+  const pos = fullText.toLowerCase().indexOf(markText.toLowerCase());
+  if (pos === -1) return markText;
+  const start = Math.max(0, pos - 40);
+  const end = Math.min(fullText.length, pos + markText.length + 40);
+  let snippet = fullText.slice(start, end).trim();
+  if (start > 0) snippet = '…' + snippet;
+  if (end < fullText.length) snippet = snippet + '…';
+  return snippet;
+}
+
+/**
  * 滚动到下一个高亮元素
  */
 function scrollToNextHighlight() {
-  if (currentMarkElements.length === 0) return;
+  if (currentMarkElements.length === 0) return null;
   const nextIndex = (currentHighlightIndex + 1) % currentMarkElements.length;
   scrollToHighlight(nextIndex);
+  return getSnippetAtIndex(nextIndex);
 }
 
 /**
  * 滚动到上一个高亮元素
  */
 function scrollToPrevHighlight() {
-  if (currentMarkElements.length === 0) return;
+  if (currentMarkElements.length === 0) return null;
   const prevIndex = currentHighlightIndex <= 0 
     ? currentMarkElements.length - 1 
     : currentHighlightIndex - 1;
   scrollToHighlight(prevIndex);
+  return getSnippetAtIndex(prevIndex);
 }
 
 // 监听来自 background 的消息
@@ -211,11 +234,11 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
     scrollToFirstHighlight();
     sendResponse({ ok: true });
   } else if (message.action === 'scrollToNext') {
-    scrollToNextHighlight();
-    sendResponse({ ok: true, index: currentHighlightIndex, total: currentMarkElements.length });
+    const snippet = scrollToNextHighlight();
+    sendResponse({ ok: true, index: currentHighlightIndex, total: currentMarkElements.length, snippet });
   } else if (message.action === 'scrollToPrev') {
-    scrollToPrevHighlight();
-    sendResponse({ ok: true, index: currentHighlightIndex, total: currentMarkElements.length });
+    const snippet = scrollToPrevHighlight();
+    sendResponse({ ok: true, index: currentHighlightIndex, total: currentMarkElements.length, snippet });
   } else if (message.action === 'getHighlightInfo') {
     sendResponse({ 
       ok: true, 

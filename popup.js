@@ -258,6 +258,25 @@ async function navigateHighlight(tabId, direction) {
       if (indicator && response.total > 0) {
         indicator.textContent = `${response.index + 1} / ${response.total}`;
       }
+      // 刷新摘要列表：只显示当前高亮附近的那一条
+      if (response.snippet !== undefined) {
+        const card = document.querySelector(`.tab-card[data-tab-id="${tabId}"]`);
+        if (card) {
+          const snippetsContainer = card.querySelectorAll('.snippet');
+          // 移除旧的所有 snippet
+          snippetsContainer.forEach(el => el.remove());
+          // 在 URL div 后插入新 snippet
+          const urlDiv = card.querySelector('.tab-url');
+          const newSnippet = document.createElement('div');
+          newSnippet.className = 'snippet';
+          newSnippet.textContent = response.snippet || '';
+          if (urlDiv && urlDiv.nextSibling) {
+            urlDiv.parentNode.insertBefore(newSnippet, urlDiv.nextSibling);
+          } else if (urlDiv) {
+            urlDiv.parentNode.appendChild(newSnippet);
+          }
+        }
+      }
     }
   } catch (e) {
     console.error('导航失败:', e);
