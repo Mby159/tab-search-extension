@@ -47,7 +47,7 @@ function searchInPage(query) {
 
   // 高亮并收集摘要
   matchedNodes.forEach((textNode) => {
-    const snippets = extractSnippets(textNode.textContent, lowerQuery, query);
+    const snippets = extractSnippets(textNode.textContent, lowerQuery, query, textNode);
     snippets.forEach(s => results.push(s));
     highlightNode(textNode, query);
   });
@@ -60,9 +60,22 @@ function searchInPage(query) {
 }
 
 /**
+ * 从文本节点的祖先元素收集上下文文本（最多向上3层，最多取200字）
+ */
+function getContextText(textNode) {
+  let el = textNode.parentElement;
+  for (let i = 0; i < 3 && el && el !== document.body; i++) {
+    const text = el.textContent.trim();
+    if (text.length >= 20) return text.slice(0, 200); // 够长就用
+    el = el.parentElement;
+  }
+  return textNode.textContent;
+}
+
+/**
  * 提取匹配片段（带上下文）
  */
-function extractSnippets(text, lowerQuery, query) {
+function extractSnippets(text, lowerQuery, query, textNode) {
   const snippets = [];
   const lowerText = text.toLowerCase();
   let pos = 0;
@@ -71,11 +84,25 @@ function extractSnippets(text, lowerQuery, query) {
     const idx = lowerText.indexOf(lowerQuery, pos);
     if (idx === -1) break;
 
-    const start = Math.max(0, idx - 40);
-    const end = Math.min(text.length, idx + lowerQuery.length + 40);
-    let snippet = text.slice(start, end).trim();
+    let contextText = text;
+    let contextIdx = idx;
+
+    // 如果文本太短（不超过关键词本身+10字），尝试取父元素上下文
+    if (textNode && text.length < lowerQuery.length + 10) {
+      const parent = getContextText(textNode);
+      const lowerParent = parent.toLowerCase();
+      const pIdx = lowerParent.indexOf(lowerQuery);
+      if (pIdx !== -1) {
+        contextText = parent;
+        contextIdx = pIdx;
+      }
+    }
+
+    const start = Math.max(0, contextIdx - 40);
+    const end = Math.min(contextText.length, contextIdx + lowerQuery.length + 40);
+    let snippet = contextText.slice(start, end).trim();
     if (start > 0) snippet = '…' + snippet;
-    if (end < text.length) snippet = snippet + '…';
+    if (end < contextText.length) snippet = snippet + '…';
 
     snippets.push(snippet);
     pos = idx + lowerQuery.length;
@@ -83,6 +110,7 @@ function extractSnippets(text, lowerQuery, query) {
 
   return snippets;
 }
+
 
 /**
  * 高亮文本节点中所有匹配项
@@ -185,19 +213,27 @@ function scrollToFirstHighlight() {
 function getSnippetAtIndex(index) {
   if (index < 0 || index >= currentMarkElements.length) return '';
   const mark = currentMarkElements[index];
-  // 取 mark 所在父元素的完整文本，截取前后各40字符
-  const parent = mark.parentElement;
-  if (!parent) return mark.textContent;
-  const fullText = parent.textContent;
   const markText = mark.textContent;
-  const pos = fullText.toLowerCase().indexOf(markText.toLowerCase());
-  if (pos === -1) return markText;
-  const start = Math.max(0, pos - 40);
-  const end = Math.min(fullText.length, pos + markText.length + 40);
-  let snippet = fullText.slice(start, end).trim();
-  if (start > 0) snippet = '…' + snippet;
-  if (end < fullText.length) snippet = snippet + '…';
-  return snippet;
+
+  // 向上找有意义的上下文
+  let el = mark.parentElement;
+  for (let i = 0; i < 3 && el && el !== document.body; i++) {
+    const text = el.textContent.trim();
+    if (text.length >= markText.length + 10) {
+      const pos = text.toLowerCase().indexOf(markText.toLowerCase());
+      if (pos !== -1) {
+        const start = Math.max(0, pos - 40);
+        const end = Math.min(text.length, pos + markText.length + 40);
+        let snippet = text.slice(start, end).trim();
+        if (start > 0) snippet = '…' + snippet;
+        if (end < text.length) snippet = snippet + '…';
+        return snippet;
+      }
+    }
+    el = el.parentElement;
+  }
+
+  return markText;
 }
 
 /**
