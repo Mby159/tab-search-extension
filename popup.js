@@ -377,5 +377,17 @@ clearBtn.addEventListener('click', clearSearch);
 // 结果区域键盘导航
 resultsEl.addEventListener('keydown', handleKeyNavigation);
 
-// 打开时自动聚焦
-searchInput.focus();
+// ── 启动时恢复上次搜索 ────────────────────────────────────
+(async () => {
+  try {
+    const resp = await browser.runtime.sendMessage({ action: 'getLastQuery' });
+    if (resp && resp.query) {
+      searchInput.value = resp.query;
+      await doSearch(resp.query);
+      // 光标移到末尾
+      searchInput.setSelectionRange(resp.query.length, resp.query.length);
+    }
+  } catch (_) {}
+  searchInput.focus();
+})();
+
