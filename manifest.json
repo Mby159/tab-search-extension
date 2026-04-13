@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "Tab Content Search",
-  "version": "1.2.0",
+  "version": "1.2.4",
   "description": "搜索所有已打开标签页的页面内容 | Search across all open tabs",
   "icons": {
     "48": "icons/icon48.png",

@@ -45,11 +45,13 @@ function searchInPage(query) {
     }
   }
 
-  // 高亮并收集摘要
+  // 高亮并收集摘要（每条摘要记录其对应的 markIndex）
   matchedNodes.forEach((textNode) => {
-    const snippets = extractSnippets(textNode.textContent, lowerQuery, query, textNode);
-    snippets.forEach(s => results.push(s));
+    // 先记录高亮前的 mark 数量（即当前文本节点高亮后第一个 mark 的起始索引）
+    const markStartIndex = currentMarkElements.length;
     highlightNode(textNode, query);
+    const snippetItems = extractSnippets(textNode.textContent, lowerQuery, query, textNode, markStartIndex);
+    snippetItems.forEach(item => results.push(item));
   });
 
   // 重置索引
@@ -60,25 +62,36 @@ function searchInPage(query) {
 }
 
 /**
- * 从文本节点的祖先元素收集上下文文本（最多向上3层，最多取200字）
+ * 从文本节点的祖先元素收集上下文文本
+ * 一直向上遍历，直到找到足够长的文本（>= minLen），或到达 body
+ * 同时跳过会导致文本过长（噪音太多）的大容器
  */
-function getContextText(textNode) {
+function getContextText(textNode, minLen = 30, maxLen = 200) {
   let el = textNode.parentElement;
-  for (let i = 0; i < 3 && el && el !== document.body; i++) {
+  let bestText = textNode.textContent.trim();
+
+  while (el && el !== document.body && el !== document.documentElement) {
     const text = el.textContent.trim();
-    if (text.length >= 20) return text.slice(0, 200); // 够长就用
+    // 找到足够长但不过于巨大的祖先（避免拿到整个页面正文）
+    if (text.length >= minLen && text.length <= 2000) {
+      bestText = text;
+      if (text.length >= minLen * 2) break; // 已经足够丰富，停止
+    }
     el = el.parentElement;
   }
-  return textNode.textContent;
+
+  return bestText.slice(0, maxLen);
 }
 
 /**
- * 提取匹配片段（带上下文）
+ * 提取匹配片段（带上下文），返回 [{text, markIndex}] 数组
+ * markStartIndex：该文本节点高亮后第一个 mark 在 currentMarkElements 中的起始索引
  */
-function extractSnippets(text, lowerQuery, query, textNode) {
+function extractSnippets(text, lowerQuery, query, textNode, markStartIndex = 0) {
   const snippets = [];
   const lowerText = text.toLowerCase();
   let pos = 0;
+  let localMarkOffset = 0; // 当前文本节点内第几个匹配
 
   while (true) {
     const idx = lowerText.indexOf(lowerQuery, pos);
@@ -87,14 +100,22 @@ function extractSnippets(text, lowerQuery, query, textNode) {
     let contextText = text;
     let contextIdx = idx;
 
-    // 如果文本太短（不超过关键词本身+10字），尝试取父元素上下文
-    if (textNode && text.length < lowerQuery.length + 10) {
-      const parent = getContextText(textNode);
+    // 如果文本较短（不足100字），尝试取父元素上下文以获取更丰富的内容
+    if (textNode && text.length < 100) {
+      const parent = getContextText(textNode, 30, 200);
       const lowerParent = parent.toLowerCase();
-      const pIdx = lowerParent.indexOf(lowerQuery);
+      // 在父元素文本中，找到包含当前匹配上下文的正确位置
+      // 策略：先找到父元素中包含当前文本片段的位置
+      const textAroundMatch = text.slice(Math.max(0, idx - 10), Math.min(text.length, idx + lowerQuery.length + 10));
+      const lowerTextAround = textAroundMatch.toLowerCase();
+      const pIdx = lowerParent.indexOf(lowerTextAround);
       if (pIdx !== -1) {
-        contextText = parent;
-        contextIdx = pIdx;
+        // 找到了包含当前文本片段的位置，现在在该位置附近找关键词
+        const keywordIdx = lowerParent.indexOf(lowerQuery, pIdx);
+        if (keywordIdx !== -1) {
+          contextText = parent;
+          contextIdx = keywordIdx;
+        }
       }
     }
 
@@ -104,7 +125,8 @@ function extractSnippets(text, lowerQuery, query, textNode) {
     if (start > 0) snippet = '…' + snippet;
     if (end < contextText.length) snippet = snippet + '…';
 
-    snippets.push(snippet);
+    snippets.push({ text: snippet, markIndex: markStartIndex + localMarkOffset });
+    localMarkOffset++;
     pos = idx + lowerQuery.length;
   }
 
@@ -215,22 +237,18 @@ function getSnippetAtIndex(index) {
   const mark = currentMarkElements[index];
   const markText = mark.textContent;
 
-  // 向上找有意义的上下文
-  let el = mark.parentElement;
-  for (let i = 0; i < 3 && el && el !== document.body; i++) {
-    const text = el.textContent.trim();
-    if (text.length >= markText.length + 10) {
-      const pos = text.toLowerCase().indexOf(markText.toLowerCase());
-      if (pos !== -1) {
-        const start = Math.max(0, pos - 40);
-        const end = Math.min(text.length, pos + markText.length + 40);
-        let snippet = text.slice(start, end).trim();
-        if (start > 0) snippet = '…' + snippet;
-        if (end < text.length) snippet = snippet + '…';
-        return snippet;
-      }
+  // 复用 getContextText：从 mark 元素向上找有意义的上下文
+  const contextText = getContextText(mark, markText.length + 10, 200);
+  if (contextText && contextText.length > markText.length) {
+    const pos = contextText.toLowerCase().indexOf(markText.toLowerCase());
+    if (pos !== -1) {
+      const start = Math.max(0, pos - 40);
+      const end = Math.min(contextText.length, pos + markText.length + 40);
+      let snippet = contextText.slice(start, end).trim();
+      if (start > 0) snippet = '…' + snippet;
+      if (end < contextText.length) snippet = snippet + '…';
+      return snippet;
     }
-    el = el.parentElement;
   }
 
   return markText;
@@ -262,6 +280,7 @@ function scrollToPrevHighlight() {
 browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'search') {
     const snippets = searchInPage(message.query);
+    // snippets 是 [{text, markIndex}] 数组
     sendResponse({ snippets, count: currentMarkElements.length });
   } else if (message.action === 'clear') {
     clearHighlights();
@@ -274,6 +293,11 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
     sendResponse({ ok: true, index: currentHighlightIndex, total: currentMarkElements.length, snippet });
   } else if (message.action === 'scrollToPrev') {
     const snippet = scrollToPrevHighlight();
+    sendResponse({ ok: true, index: currentHighlightIndex, total: currentMarkElements.length, snippet });
+  } else if (message.action === 'scrollToIndex') {
+    // 跳转到指定 mark 索引
+    scrollToHighlight(message.index);
+    const snippet = getSnippetAtIndex(message.index);
     sendResponse({ ok: true, index: currentHighlightIndex, total: currentMarkElements.length, snippet });
   } else if (message.action === 'getHighlightInfo') {
     sendResponse({ 

@@ -175,8 +175,15 @@ function renderResults(results, query) {
 
     // Snippets
     tab.snippets.forEach(s => {
-      const snippetDiv = createElement('div', 'snippet');
-      snippetDiv.textContent = s;
+      const snippetDiv = createElement('div', 'snippet snippet-clickable');
+      // s 是 {text, markIndex} 对象
+      snippetDiv.textContent = s.text;
+      snippetDiv.dataset.markIndex = String(s.markIndex);
+      snippetDiv.title = '点击跳转到该位置';
+      snippetDiv.addEventListener('click', (e) => {
+        e.stopPropagation();
+        jumpToSnippet(tab.tabId, s.markIndex);
+      });
       snippetsDiv.appendChild(snippetDiv);
     });
 
@@ -268,8 +275,14 @@ async function navigateHighlight(tabId, direction) {
           // 在 URL div 后插入新 snippet
           const urlDiv = card.querySelector('.tab-url');
           const newSnippet = document.createElement('div');
-          newSnippet.className = 'snippet';
+          newSnippet.className = 'snippet snippet-clickable snippet-active';
           newSnippet.textContent = response.snippet || '';
+          newSnippet.dataset.markIndex = String(response.index);
+          newSnippet.title = '点击跳转到该位置';
+          newSnippet.addEventListener('click', (e) => {
+            e.stopPropagation();
+            jumpToSnippet(tabId, response.index);
+          });
           if (urlDiv && urlDiv.nextSibling) {
             urlDiv.parentNode.insertBefore(newSnippet, urlDiv.nextSibling);
           } else if (urlDiv) {
@@ -280,6 +293,35 @@ async function navigateHighlight(tabId, direction) {
     }
   } catch (e) {
     console.error('导航失败:', e);
+  }
+}
+
+/**
+ * 点击 snippet 跳转到对应高亮位置
+ */
+async function jumpToSnippet(tabId, markIndex) {
+  try {
+    const response = await browser.runtime.sendMessage({
+      action: 'scrollToIndex',
+      tabId,
+      index: markIndex
+    });
+    if (response && response.ok) {
+      // 更新导航指示器
+      const indicator = document.getElementById(`indicator-${tabId}`);
+      if (indicator && response.total > 0) {
+        indicator.textContent = `${response.index + 1} / ${response.total}`;
+      }
+      // 高亮当前点击的 snippet 条目
+      const card = document.querySelector(`.tab-card[data-tab-id="${tabId}"]`);
+      if (card) {
+        card.querySelectorAll('.snippet-clickable').forEach(el => {
+          el.classList.toggle('snippet-active', parseInt(el.dataset.markIndex) === markIndex);
+        });
+      }
+    }
+  } catch (e) {
+    console.error('跳转失败:', e);
   }
 }
 
@@ -377,13 +419,44 @@ clearBtn.addEventListener('click', clearSearch);
 // 结果区域键盘导航
 resultsEl.addEventListener('keydown', handleKeyNavigation);
 
+/**
+ * 从各标签页获取当前高亮索引并更新指示器
+ */
+async function refreshIndicators() {
+  const cards = document.querySelectorAll('.tab-card');
+  for (const card of cards) {
+    const tabId = parseInt(card.dataset.tabId);
+    if (!tabId) continue;
+    try {
+      const info = await browser.runtime.sendMessage({ action: 'getHighlightInfo', tabId });
+      if (info && info.ok) {
+        const indicator = document.getElementById(`indicator-${tabId}`);
+        if (indicator && info.total > 0) {
+          indicator.textContent = `${info.index + 1} / ${info.total}`;
+        }
+      }
+    } catch (_) {}
+  }
+}
+
 // ── 启动时恢复上次搜索 ────────────────────────────────────
 (async () => {
   try {
     const resp = await browser.runtime.sendMessage({ action: 'getLastQuery' });
     if (resp && resp.query) {
       searchInput.value = resp.query;
-      await doSearch(resp.query);
+      lastQuery = resp.query;
+      // 如果有缓存结果，直接用缓存渲染（不重新搜索）
+      if (resp.results && resp.results.length > 0) {
+        searchResults = resp.results;
+        selectedTabIndex = searchResults.length > 0 ? 0 : -1;
+        renderResults(searchResults, resp.query);
+        // 从各标签页获取当前高亮索引，更新指示器
+        await refreshIndicators();
+      } else {
+        // 没有缓存，重新搜索
+        await doSearch(resp.query);
+      }
       // 光标移到末尾
       searchInput.setSelectionRange(resp.query.length, resp.query.length);
     }

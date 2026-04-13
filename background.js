@@ -2,8 +2,9 @@
  * background.js — 协调各标签页的搜索请求
  */
 
-// 记住上一次的搜索词，供 popup 恢复用
+// 记住上一次的搜索词和结果，供 popup 恢复用
 let lastQuery = '';
+let lastResults = [];
 
 /**
  * 向指定标签页注入 content script（如果尚未注入）并发送消息
@@ -61,17 +62,21 @@ async function clearAllHighlights() {
 browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'searchAll') {
     lastQuery = message.query; // 记住搜索词
-    searchAllTabs(message.query).then(results => sendResponse({ results }));
+    searchAllTabs(message.query).then(results => {
+      lastResults = results; // 缓存结果
+      sendResponse({ results });
+    });
     return true; // 保持通道开放
   }
 
   if (message.action === 'getLastQuery') {
-    sendResponse({ query: lastQuery });
+    sendResponse({ query: lastQuery, results: lastResults });
     return true;
   }
 
   if (message.action === 'clearAll') {
     lastQuery = ''; // 清除时也重置
+    lastResults = [];
     clearAllHighlights().then(() => sendResponse({ ok: true }));
     return true;
   }
@@ -94,6 +99,24 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   if (message.action === 'scrollToPrev') {
     sendToTab(message.tabId, { action: 'scrollToPrev' }).then(resp => {
+      sendResponse(resp || { ok: false });
+    });
+    return true;
+  }
+
+  if (message.action === 'scrollToIndex') {
+    // 切换到目标标签页，然后跳转到指定 mark 索引
+    browser.tabs.update(message.tabId, { active: true }).then(() => {
+      sendToTab(message.tabId, { action: 'scrollToIndex', index: message.index }).then(resp => {
+        sendResponse(resp || { ok: false });
+      });
+    });
+    return true;
+  }
+
+  if (message.action === 'getHighlightInfo') {
+    // 查询指定标签页的当前高亮信息
+    sendToTab(message.tabId, { action: 'getHighlightInfo' }).then(resp => {
       sendResponse(resp || { ok: false });
     });
     return true;
