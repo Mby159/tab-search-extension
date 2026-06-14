@@ -29,3 +29,26 @@ jobs:
 
       - name: Validate extension files
         run: node tools/validate-extension.js
+
+  browser-smoke:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - uses: browser-actions/setup-chrome@v1
+
+      - name: Firefox web-ext lint
+        run: npx --yes web-ext lint --source-dir .
+
+      - name: Firefox web-ext build
+        run: npx --yes web-ext build --source-dir . --artifacts-dir web-ext-artifacts --overwrite-dest
+
+      - name: Chromium extension load smoke
+        env:
+          CHROMIUM: chrome
+        run: node tools/chromium-smoke.js
