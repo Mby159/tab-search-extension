@@ -98,18 +98,20 @@ async function main() {
     await popup.goto(`chrome-extension://${id}/popup.html`);
     await popup.fill('#searchInput', 'magicword');
     await popup.waitForSelector('.tab-card', { timeout: 10000 });
-    await popup.waitForSelector('mark', { timeout: 10000 });
+    await popup.waitForFunction(() => document.body.innerText.includes('magicword'), null, { timeout: 10000 });
 
     const status = await popup.locator('#statusText').innerText();
     if (!/找到/.test(status)) throw new Error(`expected search results, got status: ${status}`);
     const cards = await popup.locator('.tab-card').count();
     if (cards < 1) throw new Error('expected at least one result card');
+    const bodyText = await popup.locator('body').innerText();
+    if (!bodyText.includes('magicword')) throw new Error('expected popup text to include search hit');
 
-    await popup.screenshot({ path: path.join(artifactDir, 'tab-search-popup-results.png'), fullPage: true });
+    await popup.screenshot({ path: path.join(artifactDir, 'tab-search-popup-results.png') });
 
     await popup.locator('.focus-btn').first().click();
     await popup.waitForTimeout(500);
-    await popup.screenshot({ path: path.join(artifactDir, 'tab-search-popup-after-focus.png'), fullPage: true });
+    await popup.screenshot({ path: path.join(artifactDir, 'tab-search-popup-after-focus.png') });
 
     console.log('interaction smoke passed: popup search returned results and focus action executed');
   } finally {
