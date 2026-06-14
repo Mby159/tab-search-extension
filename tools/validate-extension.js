@@ -10,6 +10,7 @@ const jsFiles = [
   'background-mv3.js',
   'content.js',
   'popup.js',
+  'tools/chromium-smoke.js',
 ];
 const manifestFiles = ['manifest.json', 'manifest-chrome.json'];
 
