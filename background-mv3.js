@@ -1,9 +1,13 @@
 /**
  * background-mv3.js — Chrome Manifest V3 Service Worker
- * 与 background.js 逻辑相同，但适配 MV3 的 service worker 环境
- * （importScripts 引入兼容层）
+ * 与 Firefox background.js 保持功能一致。
  */
 importScripts('browser-polyfill.js');
+
+// 记住上一次的搜索词和结果，供 popup 恢复用。
+// 注意：MV3 service worker 可能被浏览器回收；这份内存缓存是 best-effort。
+let lastQuery = '';
+let lastResults = [];
 
 /**
  * 向指定标签页发送消息
@@ -57,13 +61,26 @@ async function clearAllHighlights() {
 // 监听来自 popup 的消息
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'searchAll') {
-    searchAllTabs(message.query).then(results => sendResponse({ results }));
+    lastQuery = message.query;
+    searchAllTabs(message.query).then(results => {
+      lastResults = results;
+      sendResponse({ results });
+    });
     return true;
   }
+
+  if (message.action === 'getLastQuery') {
+    sendResponse({ query: lastQuery, results: lastResults });
+    return true;
+  }
+
   if (message.action === 'clearAll') {
+    lastQuery = '';
+    lastResults = [];
     clearAllHighlights().then(() => sendResponse({ ok: true }));
     return true;
   }
+
   if (message.action === 'focusTab') {
     chrome.tabs.update(message.tabId, { active: true }).then(() => {
       sendToTab(message.tabId, { action: 'scrollToFirst' });
@@ -71,14 +88,32 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     sendResponse({ ok: true });
     return true;
   }
+
   if (message.action === 'scrollToNext') {
     sendToTab(message.tabId, { action: 'scrollToNext' }).then(resp => {
       sendResponse(resp || { ok: false });
     });
     return true;
   }
+
   if (message.action === 'scrollToPrev') {
     sendToTab(message.tabId, { action: 'scrollToPrev' }).then(resp => {
+      sendResponse(resp || { ok: false });
+    });
+    return true;
+  }
+
+  if (message.action === 'scrollToIndex') {
+    chrome.tabs.update(message.tabId, { active: true }).then(() => {
+      sendToTab(message.tabId, { action: 'scrollToIndex', index: message.index }).then(resp => {
+        sendResponse(resp || { ok: false });
+      });
+    });
+    return true;
+  }
+
+  if (message.action === 'getHighlightInfo') {
+    sendToTab(message.tabId, { action: 'getHighlightInfo' }).then(resp => {
       sendResponse(resp || { ok: false });
     });
     return true;
