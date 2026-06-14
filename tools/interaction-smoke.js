@@ -65,6 +65,19 @@ async function extensionId(context) {
   return match[1];
 }
 
+async function saveEvidence(page, name) {
+  const base = path.join(artifactDir, name);
+  const text = await page.locator('body').innerText().catch((error) => `innerText failed: ${error.message}`);
+  const html = await page.content().catch((error) => `content failed: ${error.message}`);
+  fs.writeFileSync(`${base}.txt`, text);
+  fs.writeFileSync(`${base}.html`, html);
+  try {
+    await page.screenshot({ path: `${base}.png` });
+  } catch (error) {
+    fs.writeFileSync(`${base}.screenshot-error.txt`, error.message);
+  }
+}
+
 async function main() {
   fs.mkdirSync(artifactDir, { recursive: true });
   const executablePath = chromeBinary();
@@ -107,11 +120,11 @@ async function main() {
     const bodyText = await popup.locator('body').innerText();
     if (!bodyText.includes('magicword')) throw new Error('expected popup text to include search hit');
 
-    await popup.screenshot({ path: path.join(artifactDir, 'tab-search-popup-results.png') });
+    await saveEvidence(popup, 'tab-search-popup-results');
 
     await popup.locator('.focus-btn').first().click();
     await popup.waitForTimeout(500);
-    await popup.screenshot({ path: path.join(artifactDir, 'tab-search-popup-after-focus.png') });
+    await saveEvidence(popup, 'tab-search-popup-after-focus');
 
     console.log('interaction smoke passed: popup search returned results and focus action executed');
   } finally {
