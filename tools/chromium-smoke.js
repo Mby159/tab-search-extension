@@ -57,14 +57,20 @@ const args = [
   `--user-data-dir=${profileDir}`,
   `--disable-extensions-except=${extDir}`,
   `--load-extension=${extDir}`,
+  '--run-all-compositor-stages-before-draw',
+  '--virtual-time-budget=5000',
   '--dump-dom',
   `file://${smokeHtml}`,
 ];
 
-const res = spawnSync(browser, args, { encoding: 'utf8' });
+const res = spawnSync(browser, args, { encoding: 'utf8', timeout: 30000 });
 process.stdout.write(res.stdout || '');
 process.stderr.write(res.stderr || '');
 
+if (res.error) {
+  console.error(`Chromium smoke failed to run: ${res.error.message}`);
+  process.exit(1);
+}
 if (res.status !== 0) {
   console.error(`Chromium smoke failed with exit code ${res.status}`);
   process.exit(res.status || 1);
