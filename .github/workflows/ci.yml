@@ -52,3 +52,20 @@ jobs:
         env:
           CHROMIUM: chrome
         run: node tools/chromium-smoke.js
+
+      - name: Install Playwright driver
+        run: npm install --no-save playwright-core
+
+      - name: Chromium popup interaction smoke
+        env:
+          CHROMIUM: chrome
+          ARTIFACT_DIR: playwright-artifacts
+        run: xvfb-run -a node tools/interaction-smoke.js
+
+      - name: Upload interaction screenshots
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: tab-search-extension-interaction-screenshots
+          path: playwright-artifacts
+          if-no-files-found: ignore

@@ -11,6 +11,7 @@ const jsFiles = [
   'content.js',
   'popup.js',
   'tools/chromium-smoke.js',
+  'tools/interaction-smoke.js',
 ];
 const manifestFiles = ['manifest.json', 'manifest-chrome.json'];
 
